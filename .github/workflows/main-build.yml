@@ -26,31 +26,6 @@ jobs:
         bin/init_tools ${{ secrets.GTHB_USER }} ${{ secrets.GTHB_PAT }}
         tree bin/tools
 
-    # create cachehash key
-    - name: Create hash key
-      id: cachehash
-      run: |
-        AWS_EC2_METADATA_DISABLED=true aws s3 ls $s3_bucket --recursive --no-sign-request > bucket-contents.txt
-        echo "cachehash=resources_test__$( md5sum bucket-contents.txt | awk '{ print $1 }' )" >> $GITHUB_OUTPUT
-    
-    # initialize cache
-    - name: Cache resources data
-      uses: actions/cache@v3
-      with:
-        path: resources_test
-        key: ${{ steps.cachehash.outputs.cachehash }}
-        restore-keys: resources_test_
-
-    # sync if need be
-    - name: Sync test resources
-      run: |
-        bin/viash run \
-          -p native \
-          src/download/sync_test_resources/config.vsh.yaml -- \
-          --input $s3_bucket \
-          --delete
-        tree resources_test/ -L 3
-
     - name: Build target dir
       run: |
         # allow publishing the target folder
@@ -92,7 +67,6 @@ jobs:
         echo "component_matrix=$component_json" >> $GITHUB_OUTPUT
     outputs:
       component_matrix: ${{ steps.set_matrix.outputs.component_matrix }}
-      cachehash: ${{ steps.cachehash.outputs.cachehash }}
 
   # phase 2
   build_containers:
@@ -108,6 +82,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+      with:
+        lfs: true
 
     - name: Fetch viash
       run: |
